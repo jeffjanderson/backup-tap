@@ -1,16 +1,22 @@
 # Backing up TAP
 
+> **_NOTE:_**  This research is a work in progress
+
 * Versions tested:
     * TAP Version 1.3.0
     * Velero Version 1.9.5
 
-* Steps taken:
+* Steps taken so far:
 
 1. Establish a secret containing a ytt overlay for the metadata-store statefulset, shown below.  According to [this doc](https://docs.vmware.com/en/VMware-Tanzu-Mission-Control/services/tanzumc-concepts/GUID-C16557BC-EB1B-4414-8E63-28AD92E0CAE5.html#about-restic-and-volume-snapshots-1), this shouldn’t be needed, however through testing with these versions, it is.  The below sets an annotation on the statefulset that triggers velero/restic to not only restore kubernetes objects for the metadata-store (like the statefulset, service, pvc, pv, etc), but will also include restoration of the actual data contained within the postgres database/persistent volume that is used for backing the metadata-store.  Velero includes the option of setting a flag to have the data restored in a PV by default, but at this time it is unsure if this flag can be set through TMC--but again this should be the default dataprotection behavior.  The below uses the [Velero opt-out approach](https://velero.io/docs/v1.9/restic/#to-back-up).
 
     > **_NOTE:_**  Need to follow up with Velero support to check into why opt-out isn't working by default
 
-2. It also sets runAsUser to resolve a postgres error: `Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root` that prevents the metadata-store DB pods from starting.
+2. It also sets runAsUser to resolve a postgres error: 
+
+    `Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root` 
+
+...that prevents the metadata-store DB pods from starting.
 
     ```
     apiVersion: v1
@@ -200,9 +206,9 @@
         * run tanzu package installed list -n tap-install again
         * all but tap reconciled, I looked at the useful error and had to kick ootb-supply-chain-testing-scanning.  After kicking tap, and it all succeeded.
     * Deleted antrea controller based off some errors I saw, and let it respawn.
-        * k delete pod -n kube-system antrea-controller-bb59f5fbf-x9np7     
+        * `k delete pod -n kube-system antrea-controller-bb59f5fbf-x9np7`
     * Deleted sourcescan to get past an error 
-        * kubectl -n development delete sourcescan tanzu-java-web-app
+        * `kubectl -n development delete sourcescan tanzu-java-web-app`
 
 15. Update the metadata-store bearer token (wish I didn’t have to do this).
 
