@@ -200,7 +200,7 @@
     * Restore the entire backup
         * Select Advanced Option to Update Existing Resources (can’t see an option to do this via the CLI, so using TMC UI for now)
 
-13. Run tanzu package installed list -n tap-install and observe Reconciliation failures.
+13. Run `tanzu package installed list -n tap-install` and observe Reconciliation failures.
 14. Cleanup items
     * Delete the kapp-controller pod to fix reconciliation errors.  These tend to get out of sync after a restore, deleting them and letting a new kapp-controller spawn helps overcome “Reconcile failed: the server is currently unable to handle the request (get pack…” errors
         * run tanzu package installed list -n tap-install again
