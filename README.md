@@ -12,11 +12,9 @@
 
     > **_NOTE:_**  Need to follow up with Velero support to check into why opt-out isn't working by default
 
-2. It also sets runAsUser to resolve a postgres error: 
+2. It also sets runAsUser to resolve a postgres error that prevents the metadata-store DB pods from starting:
 
     `Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root` 
-
-...that prevents the metadata-store DB pods from starting.
 
     ```
     apiVersion: v1
@@ -41,6 +39,8 @@
                 #@overlay/match missing_ok=True
                 runAsUser: 999
     ```
+
+    > **_NOTE:_**  Is there a way to configure the backup cluster to not require numeric runAsUser values?  How did the source cluster pull this off?
 
 3. Establish another secret for the source-controller, as it also requires a numeric runAsUser value:
 
@@ -210,7 +210,7 @@
     * Deleted sourcescan to get past an error 
         * `kubectl -n development delete sourcescan tanzu-java-web-app`
 
-15. Update the metadata-store bearer token (wish I didn’t have to do this).
+15. Update the metadata-store bearer token in tap-values.yaml.  Find the token with:
 
     ```
     SERVICE_ACCOUNT_SECRET_NAME=`kubectl get secrets -n metadata-store |grep metadata-store-read-client-token |sed 's/ .*//'`
@@ -218,8 +218,8 @@
     echo "METADATA_STORE_ACCESS_TOKEN is $METADATA_STORE_ACCESS_TOKEN"
     ```
 
-16. Include new access token in tap-values.yaml and update of TAP on the backup cluster and make sure it reconciles.
-17. Change DNS of your TAP GUI to point to the tanzu-system-ingress of your new backup TAP GUI
+16. Include the new bearer token in tap-values.yaml and update of TAP on the backup cluster and make sure it reconciles (you may need to kick some packages).
+17. Change DNS of your TAP GUI to point to the tanzu-system-ingress of your new backup TAP GUI.
 18. Observe the state of things in your backup TAP GUI:
     * Validate the following are available from what you noted before starting the recovery:
 
