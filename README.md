@@ -175,9 +175,9 @@ The below annotation on the metadata-store statefulset uses the [Velero opt-out 
 
     ```
     tmc cluster dataprotection create \
-          --cluster-name="jeffa2-backup" \
-          --management-cluster-name="jeffa2-mgmt-cluster" \
-          --provisioner-name="devns"
+          --cluster-name="tap-backup-cluster" \
+          --management-cluster-name="management-cluster" \
+          --provisioner-name="provisioner-name"
     ```
 
 10. Take note of all of the TAP oriented namespaces, as well as others you would like to have restored.  This research has been done by backing up and restoring only the TAP oriented namespaces and cluster scoped resources.
@@ -191,7 +191,7 @@ The below annotation on the metadata-store statefulset uses the [Velero opt-out 
     * CLI (preferred):
 
     ```
-    tmc cluster dataprotection backup create --cluster-name="jeffa2-tap-full" --include-namespaces="accelerator-system,api-auto-registration,api-portal,app-live-view,app-live-view-connector,app-live-view-conventions,appsso,build-service,cartographer-system,cert-injection-webhook,cert-manager,conventions-system,developer-conventions,development,flux-system,image-policy-system,knative-eventing,knative-serving,knative-sources,kpack,metadata-store,scan-link-system,service-bindings,services-toolkit,source-system,spring-boot-convention,stacks-operator-system,tanzu-system-ingress,tap-gui,tap-gui-postgres,tap-install,tap-telemetry,tekton-pipelines,triggermesh,vmware-sources,vmware-system-telemetry" --include-cluster-resources --backup-location-name="jeffa-clusters-2" --management-cluster-name="jeffa2-mgmt-cluster" --provisioner-name="devns" --verbosity=4 --name="tap-ns-and-cs-backup"
+    tmc cluster dataprotection backup create --cluster-name="tap-source-cluster" --include-namespaces="accelerator-system,api-auto-registration,api-portal,app-live-view,app-live-view-connector,app-live-view-conventions,appsso,build-service,cartographer-system,cert-injection-webhook,cert-manager,conventions-system,developer-conventions,development,flux-system,image-policy-system,knative-eventing,knative-serving,knative-sources,kpack,metadata-store,scan-link-system,service-bindings,services-toolkit,source-system,spring-boot-convention,stacks-operator-system,tanzu-system-ingress,tap-gui,tap-gui-postgres,tap-install,tap-telemetry,tekton-pipelines,triggermesh,vmware-sources,vmware-system-telemetry" --include-cluster-resources --backup-location-name="jeffa-clusters-2" --management-cluster-name="management-cluster" --provisioner-name="provisioner-name" --verbosity=4 --name="tap-ns-and-cs-backup"
     ```
 
 12. Restore to the Backup cluster
