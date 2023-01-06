@@ -8,11 +8,13 @@
 
 * Steps taken so far:
 
-1. Establish a secret containing a ytt overlay for the metadata-store statefulset, shown below.  According to [this doc](https://docs.vmware.com/en/VMware-Tanzu-Mission-Control/services/tanzumc-concepts/GUID-C16557BC-EB1B-4414-8E63-28AD92E0CAE5.html#about-restic-and-volume-snapshots-1), this shouldn’t be needed, however through testing with these versions, it is.  The below sets an annotation on the statefulset that triggers velero/restic to not only restore kubernetes objects for the metadata-store (like the statefulset, service, pvc, pv, etc), but will also include restoration of the actual data contained within the postgres database/persistent volume that is used for backing the metadata-store.  Velero includes the option of setting a flag to have the data restored in a PV by default, but at this time it is unsure if this flag can be set through TMC--but again this should be the default dataprotection behavior.  The below uses the [Velero opt-out approach](https://velero.io/docs/v1.9/restic/#to-back-up).
+1. Establish a secret containing a ytt overlay for the metadata-store statefulset, shown below.  According to [this doc](https://docs.vmware.com/en/VMware-Tanzu-Mission-Control/services/tanzumc-concepts/GUID-C16557BC-EB1B-4414-8E63-28AD92E0CAE5.html#about-restic-and-volume-snapshots-1), this shouldn’t be needed, however through testing with these versions, it is--at least with the metadata-store statefulset.  With other database statefulsets (like the postgres data for tap-gui-postgres), the data comes along just fine.  There must be something about reconciliation of the metadata-store resources that replaces whatever mechanism velero/restic uses to trigger the data placement?  The data appears to be there in the S3 bucket...
 
-    > **_NOTE:_**  Need to follow up with Velero support to check into why opt-out isn't working by default
+The below annotation on the metadata-store statefulset uses the [Velero opt-out approach](https://velero.io/docs/v1.9/restic/#to-back-up).
 
-2. It also sets runAsUser to resolve a postgres error that prevents the metadata-store DB pods from starting:
+    > **_NOTE:_**  Need to dive into why the default velero/restic behavior is stunted with metadata-store data
+
+2. The overlay also sets runAsUser to resolve a postgres error that prevents the metadata-store DB pods from starting.  See both the annotation for the backup data as well as the runAsUser workaround below:
 
     `Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root` 
 
@@ -40,9 +42,9 @@
                 runAsUser: 999
     ```
 
-    > **_NOTE:_**  Is there a way to configure the backup cluster to not require numeric runAsUser values?  How did the source cluster pull this off?
+    > **_NOTE:_**  Need to figure a way to configure the backup cluster to not require numeric runAsUser values.  How did the source cluster pull this off?
 
-3. Establish another secret for the source-controller, as it also requires a numeric runAsUser value:
+3. Establish another overlay secret for the source-controller, as it also requires a numeric runAsUser value:
 
     ```
     apiVersion: v1
@@ -76,7 +78,7 @@
     ```
 
 5. Apply the update and check the metadata-store statefulset and source-system deployment to make sure the values are updated accordingly.
-6. If the source TAP cluster doesn’t already use a database to persist TAP GUI data, make sure to create one.  This example namespace, statefulset & supporting resources or something similar could be used.  Be sure to note the velero backup annotation:
+6. If the source TAP cluster doesn’t already use a database to persist TAP GUI data, make sure to create one.  This example namespace, statefulset & supporting resources or something similar could be used.  Note there is no velero backup annotation required here, that workaround is only needed for the metadata-store statefulset:
 	
     ```
     ---
@@ -123,8 +125,6 @@
         metadata:
           labels:
             app: tap-gui-postgres
-          annotations:
-            backup.velero.io/backup-volumes-excludes: ""
         spec:
           initContainers:
           - name: "remove-lost-found"
@@ -171,7 +171,7 @@
     * Workloads that show with last pipeline run, last builds, and all CVE’s details
     * Vulnerabilities that show in Security Analysis
 
-9. Enable Data Protection via TMC on both clusters.  This is needed for restic (link).
+9. Enable Data Protection via TMC on both source and backup clusters.
 
     ```
     tmc cluster dataprotection create \
@@ -180,13 +180,13 @@
           --provisioner-name="devns"
     ```
 
-10. Take note of all of the TAP oriented namespaces, as well as others you would like to have restored.  Do not restore the system namespaces, just the TAP oriented ones and cluster scoped resources.
+10. Take note of all of the TAP oriented namespaces, as well as others you would like to have restored.  This research has been done by backing up and restoring only the TAP oriented namespaces and cluster scoped resources.
 11. Take backup of Full cluster
     * UI:
         * TMC -> Full cluster -> Data Protection -> Create Backup 
         * Back up selected namespaces
-            * select only the above namespaces
-            * now, make sure to include the accompanying cluster-scoped resources
+            * Select only TAP oriented namespaces
+            * Make sure to include the accompanying cluster-scoped resources
                 * Advanced Options -> Include cluster-scoped resources
     * CLI (preferred):
 
@@ -202,15 +202,11 @@
 
 13. Run `tanzu package installed list -n tap-install` and observe Reconciliation failures.
 14. Cleanup items
-    * Delete the kapp-controller pod to fix reconciliation errors.  These tend to get out of sync after a restore, deleting them and letting a new kapp-controller spawn helps overcome “Reconcile failed: the server is currently unable to handle the request (get pack…” errors
-        * run tanzu package installed list -n tap-install again
-        * all but tap reconciled, I looked at the useful error and had to kick ootb-supply-chain-testing-scanning.  After kicking tap, and it all succeeded.
-    * Deleted antrea controller based off some errors I saw, and let it respawn.
-        * `k delete pod -n kube-system antrea-controller-bb59f5fbf-x9np7`
-    * Deleted sourcescan to get past an error 
-        * `kubectl -n development delete sourcescan tanzu-java-web-app`
+    * Delete the kapp-controller pod to fix reconciliation errors.  These tend to get out of sync after a restore, deleting them and letting a new kapp-controller spawn helps overcome `“Reconcile failed: the server is currently unable to handle the request (get pack…”` errors
+        * Run `tanzu package installed list -n tap-install` again
+        * All but tap will reconcile.  A metadata-store bearer token update is required next, TAP should reconcile fine after the TAP install update for that change.
 
-15. Update the metadata-store bearer token in tap-values.yaml.  Find the token with:
+15. Update the metadata-store bearer token in tap-values.yaml.  In the backup cluster, find the token with:
 
     ```
     SERVICE_ACCOUNT_SECRET_NAME=`kubectl get secrets -n metadata-store |grep metadata-store-read-client-token |sed 's/ .*//'`
@@ -218,7 +214,7 @@
     echo "METADATA_STORE_ACCESS_TOKEN is $METADATA_STORE_ACCESS_TOKEN"
     ```
 
-16. Include the new bearer token in tap-values.yaml and update of TAP on the backup cluster and make sure it reconciles (you may need to kick some packages).
+16. Include the new bearer token in tap-values.yaml and update of TAP on the backup cluster and make sure it reconciles after some time (or kick packages to speed things up).
 17. Change DNS of your TAP GUI to point to the tanzu-system-ingress of your new backup TAP GUI.
 18. Observe the state of things in your backup TAP GUI:
     * Validate the following are available from what you noted before starting the recovery:
