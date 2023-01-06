@@ -2,8 +2,11 @@
 
 > **_NOTE:_**  This research is a work in progress
 
-* Versions tested:
+* Platform/Versions tested:
     * TAP Version 1.3.0
+    * TKGS/vSphere 7.0.3
+    * K8s v1.22.9+vmware.1-tkg.1.cc71bc8
+    * AVI 20.1.7.9154 / Contour Ingress
     * Velero Version 1.9.5
 
 * Steps taken so far:
